@@ -36,7 +36,7 @@
     "@promptx/mcp-server": "workspace:*"
   },
   "devDependencies": {
-    "electron": "28.3.3",
+    "electron": "35.7.5",
     "electron-builder": "^26.0.12",
     "electron-icon-builder": "^2.0.1",
     "electron-vite": "^2.0.0"
