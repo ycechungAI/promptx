@@ -22,7 +22,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.11.4",
+    "@modelcontextprotocol/sdk": "^1.25.2",
     "@promptx/config": "workspace:*",
     "@promptx/core": "workspace:*",
     "@promptx/logger": "workspace:*",
