@@ -20,12 +20,12 @@ export const cognition = core.cognition
 export const resource = core.resource
 export const toolx = core.toolx
 export const pouch = core.pouch
+export const project = core.project
 export const utils = core.utils
 
 // Also export individual utils for convenience
 export const version = core.version
 export const DirectoryService = core.DirectoryService
-export const ServerEnvironment = core.ServerEnvironment
 export const ProjectManager = core.ProjectManager
 export const ProjectPathResolver = core.ProjectPathResolver
 export const ProjectConfig = core.ProjectConfig

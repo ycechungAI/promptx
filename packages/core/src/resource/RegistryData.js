@@ -48,12 +48,15 @@ class RegistryData {
         for (const [protocol, resourcesOfType] of Object.entries(data.resources)) {
           if (resourcesOfType && typeof resourcesOfType === 'object') {
             for (const [id, reference] of Object.entries(resourcesOfType)) {
-              resources.push(ResourceData.fromFilePath(
+              const resourceData = ResourceData.fromFilePath(
                 reference.replace(/^@\w+:\/\//, ''), 
                 source, 
                 protocol, 
                 reference
-              ))
+              )
+              if (resourceData) { // 防御null值
+                resources.push(resourceData)
+              }
             }
           }
         }
@@ -87,7 +90,9 @@ class RegistryData {
    * @param {ResourceData|Object} resource - 资源数据
    */
   addResource(resource) {
+    if (!resource) return // 防御null值
     const resourceData = resource instanceof ResourceData ? resource : ResourceData.fromRawData(resource)
+    if (!resourceData) return // 防御null值
     
     // 对于merged类型的注册表，保持原始来源信息
     // 只有在非merged注册表中才强制统一来源
@@ -135,7 +140,10 @@ class RegistryData {
    * @returns {Array<ResourceData>} 匹配的资源数组
    */
   findResources(filters = {}) {
-    return this.resources.filter(resource => resource.matches(filters))
+    return this.resources.filter(resource => {
+      if (!resource) return false // 防御null值
+      return resource.matches(filters)
+    })
   }
 
   /**
@@ -146,6 +154,7 @@ class RegistryData {
    */
   findResourceById(id, protocol = null) {
     return this.resources.find(r => {
+      if (!r) return false // 防御null值
       if (protocol) {
         return r.id === id && r.protocol === protocol
       }
@@ -159,7 +168,7 @@ class RegistryData {
    * @returns {Array<ResourceData>} 资源数组
    */
   getResourcesByProtocol(protocol) {
-    return this.resources.filter(r => r.protocol === protocol)
+    return this.resources.filter(r => r && r.protocol === protocol) // 防御null值
   }
 
   /**
@@ -176,6 +185,7 @@ class RegistryData {
     const registry = new Map()
     
     for (const resource of this.resources) {
+      if (!resource) continue // 防御null值
       if (includeSourcePrefix) {
         // 包含源前缀的完整ID
         registry.set(resource.getFullId(), resource.reference)
@@ -211,6 +221,7 @@ class RegistryData {
     }
 
     for (const resource of this.resources) {
+      if (!resource) continue // 防御null值
       // 按协议统计
       stats.byProtocol[resource.protocol] = (stats.byProtocol[resource.protocol] || 0) + 1
       

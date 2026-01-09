@@ -25,8 +25,8 @@ class RecallCommand extends BasePouchCommand {
    * 组装Layers - 使用两层架构
    */
   async assembleLayers(args) {
-    // 解析参数：--role, query
-    const { role, query } = this.parseArgs(args)
+    // 解析参数：--role, query, mode
+    const { role, query, mode } = this.parseArgs(args)
 
     if (!role) {
       // 错误情况：只创建角色层显示错误
@@ -35,42 +35,73 @@ class RecallCommand extends BasePouchCommand {
         'error: 缺少必填参数 role',
         ['使用方法：recall 角色ID [查询关键词]',
          '示例：recall java-developer "React Hooks"',
-         '通过 welcome 工具查看所有可用角色']
+         '通过 discover 工具查看所有可用角色']
       ))
       this.registerLayer(roleLayer)
       return
     }
 
     logger.info('🧠 [RecallCommand] 开始记忆检索流程 (基于认知体系)')
-    logger.info(`🔍 [RecallCommand] 角色: ${role}, 查询内容: ${query ? `"${query}"` : '全部记忆'}`)
+    logger.info(` [RecallCommand] 角色: ${role}, 查询内容: ${query ? `"${query}"` : '全部记忆'}, 模式: ${mode || 'balanced'}`)
 
     try {
       let mind = null
-      if (query) {
-        // 有查询词时，执行 recall
-        mind = await this.cognitionManager.recall(role, query)
-      } else {
-        // 无查询词时，执行 prime 获取全局概览
-        mind = await this.cognitionManager.prime(role)
+      let fallbackToDMN = false
+
+      // 始终执行 recall，query为null时触发DMN模式
+      mind = await this.cognitionManager.recall(role, query, { mode })
+
+      // DMN Fallback: 如果有查询词但没找到任何记忆，自动回退到DMN模式
+      if (query && (!mind || mind.activatedCues.size === 0)) {
+        logger.info('[RecallCommand] No results found for query, falling back to DMN mode')
+        mind = await this.cognitionManager.recall(role, null, { mode })
+        fallbackToDMN = true
       }
-      
+
       if (!mind) {
         logger.warn(`[RecallCommand] No mind returned for role: ${role}, query: ${query}`)
+      } else {
+        // Debug logging for mind structure in RecallCommand
+        logger.info('[RecallCommand] DEBUG - Mind structure after recall/prime:', {
+          hasMind: !!mind,
+          mindKeys: Object.keys(mind),
+          hasEngrams: !!mind.engrams,
+          engramsLength: mind.engrams?.length,
+          engramsType: typeof mind.engrams,
+          activatedCuesSize: mind.activatedCues?.size,
+          roleId: role,
+          query: query,
+          fallbackToDMN: fallbackToDMN,
+          operationType: query ? 'recall' : 'prime'
+        })
+
+        // Deep debug: log actual mind object structure
+        logger.debug('[RecallCommand] DEBUG - Full mind object:', JSON.stringify(mind, null, 2))
       }
-      
+
       const nodeCount = mind ? mind.activatedCues.size : 0
-      logger.info(`✅ [RecallCommand] 认知检索完成 - 激活 ${nodeCount} 个节点`)
+      logger.info(` [RecallCommand] 认知检索完成 - 激活 ${nodeCount} 个节点${fallbackToDMN ? ' (DMN Fallback)' : ''}`)
 
       // 设置上下文
       this.context.roleId = role
       this.context.query = query
       this.context.mind = mind
+      this.context.fallbackToDMN = fallbackToDMN
 
       // 1. 创建认知层 (最高优先级)
-      const operationType = query ? 'recall' : 'prime'
-      const cognitionLayer = query 
-        ? CognitionLayer.createForRecall(mind, role, query)
-        : CognitionLayer.createForPrime(mind, role)
+      const operationType = fallbackToDMN ? 'prime' : (query ? 'recall' : 'prime')
+      const cognitionLayer = fallbackToDMN
+        ? CognitionLayer.createForPrime(mind, role)
+        : (query
+            ? CognitionLayer.createForRecall(mind, role, query)
+            : CognitionLayer.createForPrime(mind, role))
+
+      // 添加 fallback 标记到 metadata
+      if (fallbackToDMN) {
+        cognitionLayer.metadata.fallbackToDMN = true
+        cognitionLayer.metadata.originalQuery = query
+      }
+
       this.registerLayer(cognitionLayer)
 
       // 2. 创建角色层 (次优先级)
@@ -84,8 +115,8 @@ class RecallCommand extends BasePouchCommand {
       this.registerLayer(roleLayer)
 
     } catch (error) {
-      logger.error(`❌ [RecallCommand] 记忆检索失败: ${error.message}`)
-      logger.debug(`🐛 [RecallCommand] 错误堆栈: ${error.stack}`)
+      logger.error(` [RecallCommand] 记忆检索失败: ${error.message}`)
+      logger.debug(` [RecallCommand] 错误堆栈: ${error.stack}`)
       
       // 错误情况：只创建角色层显示错误
       const roleLayer = new RoleLayer()
@@ -113,11 +144,24 @@ class RecallCommand extends BasePouchCommand {
       return args[0]
     }
 
-    // 命令行格式：recall role [query]
+    // 命令行格式：recall role [query] [--mode=creative|balanced|focused]
     const role = args[0]
-    const query = args.slice(1).join(' ')
+    let mode = null
+    const queryParts = []
 
-    return { role, query }
+    // 解析参数
+    for (let i = 1; i < args.length; i++) {
+      const arg = args[i]
+      if (arg.startsWith('--mode=')) {
+        mode = arg.split('=')[1]
+      } else {
+        queryParts.push(arg)
+      }
+    }
+
+    const query = queryParts.join(' ')
+
+    return { role, query, mode }
   }
 }
 

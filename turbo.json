@@ -1,12 +1,11 @@
 {
   "$schema": "https://turbo.build/schema.json",
-  "extends": ["//"],
   "globalDependencies": ["**/.env.*local"],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
       "outputs": ["dist/**", "out/**", ".next/**", "!.next/cache/**"],
-      "inputs": ["src/**", "package.json", "tsconfig.json", "*.config.*"],
+      "inputs": ["src/**", "resources/**", "scripts/**", "package.json", "tsconfig.json", "*.config.*"],
       "env": ["NODE_ENV"]
     },
     "lint": {

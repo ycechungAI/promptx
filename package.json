@@ -1,6 +1,5 @@
 {
   "name": "root",
-  "version": "1.11.0",
   "private": true,
   "description": "DPML-powered AI prompt framework - Revolutionary AI-First CLI system based on Deepractice Prompt Markup Language. Build sophisticated AI agents with structured prompts, memory systems, and execution frameworks.",
   "scripts": {
@@ -13,7 +12,8 @@
     "changeset": "changeset",
     "changeset:add": "changeset add",
     "changeset:status": "changeset status",
-    "prepare": "npx lefthook install"
+    "prepare": "npx lefthook install",
+    "postinstall": "pnpm rebuild better-sqlite3 || true"
   },
   "devDependencies": {
     "@changesets/changelog-github": "^0.5.1",
@@ -21,7 +21,7 @@
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
     "@evilmartians/lefthook": "^1.12.3",
-    "@types/node": "^24.3.0",
+    "@types/node": "^18.0.0",
     "@vitest/coverage-v8": "^2.1.9",
     "@vitest/ui": "^2.1.9",
     "eslint": "^8.57.1",
@@ -34,7 +34,7 @@
     "vitest": "^2.1.9"
   },
   "engines": {
-    "node": ">=14.0.0",
+    "node": ">=18.17.0",
     "npm": ">=6.0.0"
   },
   "keywords": [
@@ -73,5 +73,7 @@
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
+  },
+  "dependencies": {
   }
 }

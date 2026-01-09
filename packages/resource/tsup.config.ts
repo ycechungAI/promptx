@@ -21,27 +21,30 @@ export default defineConfig({
       console.log('🔍 Discovering resources...')
       execSync('node scripts/generate-registry.js', { stdio: 'inherit' })
       
+      // 复制package.json到dist（与编译后的文件同级）
+      console.log('📦 Copying package.json to dist...')
+      copyFileSync('package.json', 'dist/package.json')
+      console.log('✓ Package.json copied successfully')
+      
       // 复制资源文件到 dist
       console.log('📦 Copying resources to dist...')
       if (existsSync('resources')) {
         cpSync('resources', 'dist/resources', { recursive: true })
         console.log('✓ Resources copied successfully')
       } else {
-        console.warn('⚠️  Resources directory not found')
+        console.warn(' Resources directory not found')
       }
       
-      // 复制注册表到 dist
-      console.log('📋 Copying registry to dist...')
-      if (existsSync('registry.json')) {
-        copyFileSync('registry.json', 'dist/registry.json')
-        console.log('✓ Registry copied successfully')
+      // registry.json 已经直接生成到 dist 目录，无需复制
+      if (existsSync('dist/registry.json')) {
+        console.log('✓ Registry generated successfully in dist/')
       } else {
-        console.warn('⚠️  Registry file not found')
+        console.warn('⚠ Registry file not found in dist/')
       }
       
-      console.log('✅ Build complete with resources')
+      console.log('Build complete with resources')
     } catch (error) {
-      console.error('❌ Error during onSuccess:', error)
+      console.error('Error during onSuccess:', error)
       // 不要抛出错误，继续构建过程
     }
   }

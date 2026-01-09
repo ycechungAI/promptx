@@ -86,60 +86,126 @@ export function createLogger(config: LoggerConfig = {}): pino.Logger {
     }
   }
   
-  // Build transports configuration
-  const targets: any[] = []
+  // For Electron desktop app, avoid worker thread issues
+  const isElectron = process.versions && process.versions.electron
   
-  // Console transport
-  if (finalConfig.console) {
-    targets.push({
-      target: 'pino-pretty',
-      level: finalConfig.level,
-      options: {
-        colorize: finalConfig.colors,
-        translateTime: 'SYS:yyyy-mm-dd HH:MM:ss.l',  // SYS: uses system timezone
-        ignore: 'hostname,pid,package,file,line',
-        messageFormat: '{package} [{file}:{line}] {msg}'
-      }
-    })
-  }
-  
-  // File transport
-  if (finalConfig.file) {
-    const fileConfig = typeof finalConfig.file === 'object' ? finalConfig.file : {}
-    const logDir = fileConfig.dirname || path.join(os.homedir(), '.promptx', 'logs')
-    const today = new Date().toISOString().split('T')[0]
+  if (isElectron || process.env.PROMPTX_NO_WORKERS === 'true') {
+    // For Electron: use sync mode to avoid worker thread issues
+    // Simply disable transports and use basic pino with file destination
     
-    targets.push({
-      target: 'pino/file',
-      level: finalConfig.level,
-      options: {
-        destination: path.join(logDir, `promptx-${today}.log`)
+    if (finalConfig.file) {
+      const fileConfig = typeof finalConfig.file === 'object' ? finalConfig.file : {}
+      const logDir = fileConfig.dirname || path.join(os.homedir(), '.promptx', 'logs')
+      const today = new Date().toISOString().split('T')[0]
+      const logPath = path.join(logDir, `promptx-${today}.log`)
+
+      try {
+        // Use pino.destination with sync mode for Electron
+        const dest = pino.destination({
+          dest: logPath,
+          sync: true  // Use sync to avoid worker thread issues in Electron
+        })
+
+        return pino({
+          level: finalConfig.level || 'info',
+          base: { pid: process.pid },
+          mixin: () => getCallerInfo(),
+          // Simple formatting without pino-pretty to avoid worker threads
+          formatters: {
+            level: (label) => {
+              return { level: label }
+            },
+            log: (obj) => {
+              const { package: pkg, file, line, ...rest } = obj
+              return {
+                ...rest,
+                location: pkg && file ? `${pkg} [${file}:${line}]` : undefined
+              }
+            }
+          }
+        }, dest)
+      } catch (err) {
+        // File may be locked by another instance, fall back to console only
+        console.warn(`[logger] Cannot open log file (may be locked by another instance): ${logPath}`)
       }
-    })
-    
-    // Separate error log
-    targets.push({
-      target: 'pino/file',
-      level: 'error',
-      options: {
-        destination: path.join(logDir, `promptx-error-${today}.log`)
-      }
-    })
-  }
-  
-  // Create logger with transports
-  if (targets.length > 0) {
+    }
+
+    // Console only mode for Electron without pino-pretty (or file open failed)
     return pino({
       level: finalConfig.level || 'info',
       base: { pid: process.pid },
       mixin: () => getCallerInfo(),
-      transport: {
-        targets
+      formatters: {
+        level: (label) => {
+          return { level: label }
+        },
+        log: (obj) => {
+          const { package: pkg, file, line, ...rest } = obj
+          return {
+            ...rest,
+            location: pkg && file ? `${pkg} [${file}:${line}]` : undefined
+          }
+        }
       }
     })
+  } else {
+    // Use transports for non-Electron environments (better for servers)
+    const targets: any[] = []
+    
+    // Console transport
+    if (finalConfig.console) {
+      targets.push({
+        target: 'pino-pretty',
+        level: finalConfig.level,
+        options: {
+          // MCP stdio模式下禁用颜色，避免ANSI转义码
+          colorize: process.env.MCP_TRANSPORT === 'stdio' ? false : finalConfig.colors,
+          translateTime: 'SYS:yyyy-mm-dd HH:MM:ss.l',
+          ignore: 'hostname,pid,package,file,line',
+          destination: 2, // 输出到 stderr (fd 2) - MCP官方最佳实践
+          messageFormat: '{package} [{file}:{line}] {msg}'
+        }
+      })
+    }
+    
+    // File transport
+    if (finalConfig.file) {
+      const fileConfig = typeof finalConfig.file === 'object' ? finalConfig.file : {}
+      const logDir = fileConfig.dirname || path.join(os.homedir(), '.promptx', 'logs')
+      const today = new Date().toISOString().split('T')[0]
+      
+      targets.push({
+        target: 'pino/file',
+        level: finalConfig.level,
+        options: {
+          destination: path.join(logDir, `promptx-${today}.log`)
+        }
+      })
+      
+      // Separate error log
+      targets.push({
+        target: 'pino/file',
+        level: 'error',
+        options: {
+          destination: path.join(logDir, `promptx-error-${today}.log`)
+        }
+      })
+    }
+    
+    // Create logger with transports
+    if (targets.length > 0) {
+      return pino({
+        level: finalConfig.level || 'info',
+        base: { pid: process.pid },
+        mixin: () => getCallerInfo(),
+        transport: {
+          targets
+        }
+      })
+    }
   }
   
-  // Fallback to basic logger if no transports
+  // Fallback to basic logger
   return pino({
     level: finalConfig.level || 'info',
     base: { pid: process.pid },
@@ -150,44 +216,70 @@ export function createLogger(config: LoggerConfig = {}): pino.Logger {
 // Default logger instance
 const logger = createLogger()
 
-// Export convenience methods
-export const error = (msg: string | object, ...args: any[]) => {
-  if (typeof msg === 'string') {
-    logger.error(msg)
+// Export convenience methods with flexible API
+// Supports both:
+// - logger.info(msg) - simple message
+// - logger.info(msg, obj) - message + context object (natural order)
+// - logger.info(obj, msg) - Pino native order (backward compatible)
+export const error = (msgOrObj: string | object, objOrMsg?: object | string) => {
+  if (typeof msgOrObj === 'string') {
+    // logger.error(msg) or logger.error(msg, obj)
+    if (objOrMsg && typeof objOrMsg === 'object') {
+      logger.error(objOrMsg, msgOrObj)  // Swap to Pino's (obj, msg) order
+    } else {
+      logger.error(msgOrObj)
+    }
   } else {
-    logger.error(msg, args[0] || '')
+    // logger.error(obj, msg) - Pino native
+    logger.error(msgOrObj, objOrMsg as string || '')
   }
 }
 
-export const warn = (msg: string | object, ...args: any[]) => {
-  if (typeof msg === 'string') {
-    logger.warn(msg)
+export const warn = (msgOrObj: string | object, objOrMsg?: object | string) => {
+  if (typeof msgOrObj === 'string') {
+    if (objOrMsg && typeof objOrMsg === 'object') {
+      logger.warn(objOrMsg, msgOrObj)
+    } else {
+      logger.warn(msgOrObj)
+    }
   } else {
-    logger.warn(msg, args[0] || '')
+    logger.warn(msgOrObj, objOrMsg as string || '')
   }
 }
 
-export const info = (msg: string | object, ...args: any[]) => {
-  if (typeof msg === 'string') {
-    logger.info(msg)
+export const info = (msgOrObj: string | object, objOrMsg?: object | string) => {
+  if (typeof msgOrObj === 'string') {
+    if (objOrMsg && typeof objOrMsg === 'object') {
+      logger.info(objOrMsg, msgOrObj)
+    } else {
+      logger.info(msgOrObj)
+    }
   } else {
-    logger.info(msg, args[0] || '')
+    logger.info(msgOrObj, objOrMsg as string || '')
   }
 }
 
-export const debug = (msg: string | object, ...args: any[]) => {
-  if (typeof msg === 'string') {
-    logger.debug(msg)
+export const debug = (msgOrObj: string | object, objOrMsg?: object | string) => {
+  if (typeof msgOrObj === 'string') {
+    if (objOrMsg && typeof objOrMsg === 'object') {
+      logger.debug(objOrMsg, msgOrObj)
+    } else {
+      logger.debug(msgOrObj)
+    }
   } else {
-    logger.debug(msg, args[0] || '')
+    logger.debug(msgOrObj, objOrMsg as string || '')
   }
 }
 
-export const verbose = (msg: string | object, ...args: any[]) => {
-  if (typeof msg === 'string') {
-    logger.trace(msg)
+export const verbose = (msgOrObj: string | object, objOrMsg?: object | string) => {
+  if (typeof msgOrObj === 'string') {
+    if (objOrMsg && typeof objOrMsg === 'object') {
+      logger.trace(objOrMsg, msgOrObj)
+    } else {
+      logger.trace(msgOrObj)
+    }
   } else {
-    logger.trace(msg, args[0] || '')
+    logger.trace(msgOrObj, objOrMsg as string || '')
   }
 }
 

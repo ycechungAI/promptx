@@ -1,6 +1,7 @@
 const path = require('path');
 const Module = require('module');
 const logger = require('@promptx/logger');
+const ElectronPolyfills = require('./ElectronPolyfills');
 
 /**
  * SandboxIsolationManager - 统一管理所有沙箱隔离逻辑
@@ -22,6 +23,7 @@ class SandboxIsolationManager {
       ...options
     };
     this.isolatedContext = null;
+    this.electronPolyfills = new ElectronPolyfills();
   }
 
   /**
@@ -52,7 +54,10 @@ class SandboxIsolationManager {
       // 5. 注入受限的 fs（直接可用）
       fs: this.createRestrictedFS(),
       
-      // 6. 阻止动态代码执行
+      // 6. 注入Electron polyfills（如果需要）
+      ...this.electronPolyfills.getPolyfills(),
+      
+      // 7. 阻止动态代码执行
       eval: () => {
         throw new Error('[SandboxIsolation] eval is not allowed in sandbox');
       },
@@ -86,13 +91,16 @@ class SandboxIsolationManager {
       if (moduleName === 'fs' || moduleName === 'fs/promises') {
         return this.createRestrictedFS();
       }
-      
-      // 拦截 child_process，禁止使用
+
+      // 拦截 child_process，引导使用 api.execute()
       if (moduleName === 'child_process') {
-        throw new Error('[SandboxIsolation] child_process is not allowed in sandbox');
+        throw new Error(
+          '[SandboxIsolation] Direct use of child_process is not recommended. ' +
+          'Please use api.execute() instead for better cross-platform support and error handling.'
+        );
       }
-      
-      // 拦截 path 模块，提供受限版本
+
+      // 拦截 path 模块
       if (moduleName === 'path') {
         return this.createRestrictedPath();
       }
@@ -160,140 +168,23 @@ class SandboxIsolationManager {
   }
 
   /**
-   * 创建受限的文件系统
-   * 实现完全透明的拦截，在VM层面控制文件访问边界
-   * @returns {Object} 受限的fs对象
+   * 创建文件系统访问接口
+   * 直接返回原生 fs 模块，不做限制
+   * @returns {Object} fs对象
    */
   createRestrictedFS() {
     const realFs = require('fs');
-    const boundary = path.resolve(this.workingPath); // 转为绝对路径
-    
-    logger.info(`[SandboxFS] Creating restricted FS with boundary: ${boundary}`);
-    
-    // 核心：智能路径解析，防止相对路径越权
-    const resolveSafePath = (inputPath) => {
-      // 处理undefined或null的情况
-      if (!inputPath) {
-        throw new Error('[SandboxFS] Path is required');
-      }
-      
-      // 1. 处理各种路径形式
-      let resolved;
-      
-      if (path.isAbsolute(inputPath)) {
-        // 绝对路径：直接解析
-        resolved = path.resolve(inputPath);
-      } else {
-        // 相对路径：基于 workingPath 解析
-        // 这是关键！防止 ../../ 越权
-        resolved = path.resolve(boundary, inputPath);
-      }
-      
-      // 2. 规范化路径（处理 .. 和 . ）
-      resolved = path.normalize(resolved);
-      
-      // 3. 边界检查
-      if (!resolved.startsWith(boundary)) {
-        // 记录详细信息用于调试
-        logger.error(`[SandboxFS] 文件访问越权尝试：
-          输入路径: ${inputPath}
-          解析结果: ${resolved}
-          允许边界: ${boundary}
-          调用栈: ${new Error().stack}
-        `);
-        
-        throw new Error(
-          `[SandboxFS] 文件访问被拒绝：路径 "${inputPath}" 超出工作目录边界 ${boundary}`
-        );
-      }
-      
-      return resolved;
-    };
-    
-    // 创建 Proxy 来拦截所有 fs 操作
-    const handler = {
-      get(target, prop) {
-        const original = target[prop];
-        
-        // 如果不是函数，直接返回
-        if (typeof original !== 'function') {
-          // 处理 fs.promises
-          if (prop === 'promises') {
-            return new Proxy(realFs.promises, {
-              get(promiseTarget, promiseProp) {
-                const promiseOriginal = promiseTarget[promiseProp];
-                if (typeof promiseOriginal !== 'function') {
-                  return promiseOriginal;
-                }
-                
-                // 包装 promises 方法
-                return async function(...args) {
-                  // 识别路径参数（通常是第一个）
-                  if (args.length > 0 && typeof args[0] === 'string') {
-                    args[0] = resolveSafePath(args[0]);
-                  }
-                  
-                  // 处理 rename、copyFile 等双路径操作
-                  if ((promiseProp === 'rename' || promiseProp === 'copyFile') && args.length > 1) {
-                    args[1] = resolveSafePath(args[1]);
-                  }
-                  
-                  // 调用原始函数
-                  return await promiseOriginal.apply(promiseTarget, args);
-                };
-              }
-            });
-          }
-          
-          return original;
-        }
-        
-        // 包装同步函数
-        return function(...args) {
-          // 识别路径参数（通常是第一个）
-          if (args.length > 0 && typeof args[0] === 'string') {
-            args[0] = resolveSafePath(args[0]);
-          }
-          
-          // 处理 rename、copyFile 等双路径操作
-          if ((prop === 'renameSync' || prop === 'copyFileSync') && args.length > 1) {
-            args[1] = resolveSafePath(args[1]);
-          }
-          
-          // 调用原始函数
-          return original.apply(target, args);
-        };
-      }
-    };
-    
-    // 返回代理的 fs 对象
-    return new Proxy(realFs, handler);
+    logger.debug('[SandboxFS] Providing unrestricted filesystem access');
+    return realFs;
   }
 
   /**
-   * 创建受限的 path 模块
-   * 防止使用 path.resolve 绕过限制
-   * @returns {Object} 受限的path对象
+   * 创建 path 模块访问接口
+   * 直接返回原生 path 模块
+   * @returns {Object} path对象
    */
   createRestrictedPath() {
-    const realPath = require('path');
-    const boundary = path.resolve(this.workingPath);
-    
-    return new Proxy(realPath, {
-      get(target, prop) {
-        if (prop === 'resolve') {
-          return (...args) => {
-            const resolved = target.resolve(...args);
-            // 如果解析结果超出边界，记录警告
-            if (!resolved.startsWith(boundary)) {
-              logger.warn(`[SandboxPath] path.resolve 尝试越权: ${resolved}`);
-            }
-            return resolved;
-          };
-        }
-        return target[prop];
-      }
-    });
+    return require('path');
   }
 
   /**

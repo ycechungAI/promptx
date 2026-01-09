@@ -74,25 +74,25 @@ export class ResourceService {
     }
   }
 
+
   /**
-   * 执行工具
+   * 更新资源元数据（名称和描述）
    */
-  async executeTool(toolId: string, parameters?: any): Promise<{ success: boolean; result?: any; message?: string }> {
+  async updateResourceMetadata(id: string, updates: { name?: string; description?: string }): Promise<{ success: boolean; message?: string }> {
     try {
-      const resource = await this.repository.findById(toolId)
+      const resource = await this.repository.findById(id)
       
       if (!resource) {
-        return { success: false, message: '工具不存在' }
+        return { success: false, message: '资源不存在' }
       }
 
-      if (resource.type !== 'tool') {
-        return { success: false, message: '只能执行工具类型的资源' }
+      if (resource.source !== 'user') {
+        return { success: false, message: '仅支持修改用户资源的元数据' }
       }
 
-      // TODO: 实现工具执行逻辑
-      return { success: true, message: '工具执行功能待实现' }
+      return await this.repository.updateMetadata(id, updates)
     } catch (error: any) {
-      return { success: false, message: error.message || '执行失败' }
+      return { success: false, message: error.message || '更新失败' }
     }
   }
 }
