@@ -40,14 +40,15 @@ const logger = require('@promptx/logger');
 class Engram {
   /**
    * 创建记忆痕迹
-   * 
+   *
    * @param {Object} params - 参数对象
    * @param {string} params.content - 原始经验内容
    * @param {string|Array} params.schema - 概念序列（字符串或数组）
    * @param {number} params.strength - 记忆强度 (0-1)，表示角色的主观重要性评分
+   * @param {string} params.type - Engram类型：ATOMIC(原子概念)、LINK(关系连接)、PATTERN(模式结构)
    * @param {number} [params.timestamp] - 时间戳（可选，默认为当前时间）
    */
-  constructor({ content, schema, strength, timestamp }) {
+  constructor({ content, schema, strength, type, timestamp }) {
     // 验证必需参数
     if (!content) {
       throw new Error('Engram requires content');
@@ -57,6 +58,12 @@ class Engram {
     }
     if (strength === undefined || strength === null) {
       throw new Error('Engram requires strength');
+    }
+    if (!type) {
+      throw new Error('Engram requires type (ATOMIC, LINK, or PATTERN)');
+    }
+    if (!['ATOMIC', 'LINK', 'PATTERN'].includes(type)) {
+      throw new Error('Engram type must be ATOMIC, LINK, or PATTERN');
     }
     
     /**
@@ -79,6 +86,15 @@ class Engram {
      * @type {number}
      */
     this.strength = this._validateStrength(strength);
+
+    /**
+     * Engram类型
+     * ATOMIC - 原子概念（名词、实体、具体信息）
+     * LINK - 关系连接（动词、介词、关系词）
+     * PATTERN - 模式结构（流程、方法论、框架）
+     * @type {string}
+     */
+    this.type = type;
     
     /**
      * 时间戳
@@ -87,7 +103,15 @@ class Engram {
      */
     this.timestamp = timestamp || Date.now();
     
+    /**
+     * Engram唯一标识符
+     * 格式: timestamp_randomId
+     * @type {string}
+     */
+    this.id = `${this.timestamp}_${Math.random().toString(36).substr(2, 9)}`;
+    
     logger.debug('[Engram] Created new engram', {
+      type: this.type,
       schemaLength: this.schema.length,
       strength: this.strength,
       timestamp: new Date(this.timestamp).toISOString()
@@ -96,8 +120,8 @@ class Engram {
   
   /**
    * 标准化schema格式
-   * 支持字符串（换行分隔）或数组格式
-   * 
+   * 支持多种分隔符：空格、破折号、换行符
+   *
    * @private
    * @param {string|Array} schema - 原始schema
    * @returns {Array<string>} 标准化的概念数组
@@ -106,15 +130,28 @@ class Engram {
     if (Array.isArray(schema)) {
       return schema.filter(item => item && typeof item === 'string');
     }
-    
+
     if (typeof schema === 'string') {
-      // 支持换行分隔的字符串格式
-      return schema
-        .split('\n')
+      // 支持多种分隔符格式
+      // 优先级：换行符 > 破折号 > 空格
+      let items;
+
+      if (schema.includes('\n')) {
+        // 换行分隔（向后兼容）
+        items = schema.split('\n');
+      } else if (schema.includes(' - ')) {
+        // 破折号分隔（更清晰的格式）
+        items = schema.split(' - ');
+      } else {
+        // 空格分隔（最简单通用）
+        items = schema.split(' ');
+      }
+
+      return items
         .map(s => s.trim())
         .filter(Boolean);
     }
-    
+
     throw new Error('Schema must be a string or array');
   }
   
@@ -176,9 +213,11 @@ class Engram {
    */
   toJSON() {
     return {
+      id: this.id,
       content: this.content,
       schema: this.schema,
       strength: this.strength,
+      type: this.type,
       timestamp: this.timestamp
     };
   }
@@ -192,6 +231,10 @@ class Engram {
    * @returns {Engram} 新的Engram实例
    */
   static fromJSON(json) {
+    // 兼容旧数据：如果没有type字段，默认为ATOMIC
+    if (!json.type) {
+      json.type = 'ATOMIC';
+    }
     return new Engram(json);
   }
 }

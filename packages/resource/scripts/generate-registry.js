@@ -6,8 +6,8 @@ const { glob } = require('glob');
 
 /**
  * 生成资源注册表 - v2.0.0 格式
- * 扫描 @promptx/resource 包中的所有资源文件并生成注册表
- * 遵循项目注册表的正确处理逻辑
+ * 扫描 @promptx/resource 包中的所有资源文件并生成注册表到 dist 目录
+ * 注意：registry.json 是构建产物，不是源码的一部分
  */
 async function generateRegistry() {
   try {
@@ -39,8 +39,12 @@ async function generateRegistry() {
     // 更新元数据
     registry.metadata.resourceCount = registry.resources.length;
     
-    // 保存注册表
-    const registryPath = path.join(packageRoot, 'registry.json');
+    // 确保 dist 目录存在
+    const distDir = path.join(packageRoot, 'dist');
+    await fs.mkdir(distDir, { recursive: true });
+    
+    // 保存注册表到 dist 目录
+    const registryPath = path.join(distDir, 'registry.json');
     await fs.writeFile(
       registryPath,
       JSON.stringify(registry, null, 2),

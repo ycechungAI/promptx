@@ -46,26 +46,18 @@ const TOOL_INTERFACE = {
   // 可选实现的方法
   optional: [
     {
-      name: 'getPackage',
-      signature: '() => Object',
-      description: '获取工具包信息（可选，用于依赖管理）',
-      returns: {
-        directory: 'string - 工具目录路径',
-        dependencies: 'Object - 依赖对象，格式：{包名: 版本}',
-        packageJson: 'Object - package.json内容（可选）'
-      }
+      name: 'api',
+      signature: 'ToolAPI',
+      description: '统一的工具API接口（由ToolSandbox自动注入）',
+      returns: 'ToolAPI - 提供environment, logger, storage, cache, metrics等所有运行时服务',
+      notes: '此对象由 ToolSandbox 自动注入，工具无需实现。通过 this.api 访问所有运行时功能。'
     },
     {
-      name: 'validate',
-      signature: '(parameters: Object) => Object',
-      description: '验证参数（可选，有默认实现）',
-      parameters: {
-        parameters: 'Object - 待验证参数'
-      },
-      returns: {
-        valid: 'boolean - 验证是否通过',
-        errors: 'Array<string> - 错误信息列表'
-      }
+      name: 'getDependencies',
+      signature: '() => Object',
+      description: '声明工具依赖（可选）',
+      returns: 'Object - 依赖对象，格式：{包名: 版本}',
+      notes: '声明工具需要的npm包依赖，系统会自动安装'
     },
     {
       name: 'cleanup',
@@ -81,6 +73,62 @@ const TOOL_INTERFACE = {
         config: 'Object - 初始化配置（可选）'
       },
       returns: 'void | Promise<void>'
+    },
+    {
+      name: 'getBusinessErrors',
+      signature: '() => Array<BusinessError>',
+      description: '定义工具的业务执行错误（可选但推荐）',
+      returns: `Array<{
+        code: string,        // 错误代码，如 'FILE_NOT_FOUND'
+        description: string, // 错误描述
+        match: string|RegExp|Function, // 匹配规则
+        solution: string|Object, // 解决方案
+        retryable?: boolean  // 是否可重试
+      }>`,
+      notes: '工具可以定义特有的业务错误，这些错误将被系统识别并提供给AI处理'
+    },
+    {
+      name: 'getBridges',
+      signature: '() => Object<Bridge>',
+      description: '定义工具的外部依赖桥接器（可选但推荐）',
+      returns: `Object<{
+        [operation: string]: {
+          real: async (args, api) => any,  // 真实实现
+          mock: async (args, api) => any   // Mock实现
+        }
+      }>`,
+      notes: '定义外部依赖的real和mock实现，支持dry-run测试。每个操作需要提供real和/或mock实现。',
+      example: `{
+        'mysql:connect': {
+          real: async (args, api) => {
+            const mysql2 = await api.importx('mysql2/promise');
+            return await mysql2.createConnection(args);
+          },
+          mock: async (args, api) => ({
+            execute: async () => [[], []],
+            end: async () => {}
+          })
+        }
+      }`
+    },
+    {
+      name: 'getMockArgs',
+      signature: '(operation: string) => Object',
+      description: '为指定bridge操作生成mock参数（可选）',
+      parameters: {
+        operation: 'string - bridge操作名称'
+      },
+      returns: 'Object - 该操作的mock参数',
+      notes: '用于dry-run测试时生成合理的测试参数'
+    },
+    {
+      name: 'getBridgeErrors',
+      signature: '() => Object<Array<BusinessError>>',
+      description: '定义每个bridge操作的特定业务错误（可选）',
+      returns: `Object<{
+        [operation: string]: Array<BusinessError>
+      }>`,
+      notes: '为每个bridge操作定义特定的错误处理规则'
     }
   ]
 };
@@ -144,15 +192,26 @@ class ExampleTool {
 
   getSchema() {
     return {
-      type: 'object',
-      properties: {
-        input: {
-          type: 'string',
-          description: '输入参数'
-        }
-      },
-      required: ['input'],
-      additionalProperties: false
+      // 执行参数Schema
+      parameters: {
+        type: 'object',
+        properties: {
+          input: {
+            type: 'string',
+            description: '输入参数'
+          }
+        },
+        required: ['input'],
+        additionalProperties: false
+      }
+      // 如需环境变量，添加 environment 字段
+      // environment: {
+      //   type: 'object',
+      //   properties: {
+      //     API_KEY: { type: 'string', description: 'API密钥' }
+      //   },
+      //   required: ['API_KEY']
+      // }
     };
   }
 
@@ -165,7 +224,7 @@ class ExampleTool {
     return result;
   }
 
-  // 可选：声明依赖（新格式：对象）
+  // 可选：声明依赖
   getDependencies() {
     return {
       'lodash': '^4.17.21',
@@ -173,20 +232,29 @@ class ExampleTool {
     };
   }
 
-  // 可选：自定义参数验证
-  validate(parameters) {
-    const errors = [];
-    
-    if (!parameters.input || parameters.input.trim() === '') {
-      errors.push('input不能为空');
-    }
-    
-    return { valid: errors.length === 0, errors };
-  }
-
   // 可选：清理资源
   cleanup() {
-    console.log('清理资源');
+    console.log('Cleaning up resources');
+  }
+  
+  // 可选：定义业务错误
+  getBusinessErrors() {
+    return [
+      {
+        code: 'INVALID_INPUT_FORMAT',
+        description: '输入格式不正确',
+        match: /invalid format|format error/i,
+        solution: '请检查输入格式是否符合要求',
+        retryable: false
+      },
+      {
+        code: 'PROCESSING_TIMEOUT',
+        description: '处理超时',
+        match: 'processing timeout',
+        solution: '处理时间过长，请稍后重试',
+        retryable: true
+      }
+    ];
   }
 }
 

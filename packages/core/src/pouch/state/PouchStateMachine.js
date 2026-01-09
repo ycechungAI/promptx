@@ -84,11 +84,11 @@ class PouchStateMachine {
    */
   getAvailableTransitions () {
     const transitions = {
-      initial: ['init', 'welcome'],
-      initialized: ['welcome', 'action', 'learn'],
+      initial: ['init', 'discover'],
+      initialized: ['discover', 'action', 'learn'],
       discovering: ['action', 'learn', 'init'],
-      activated: ['learn', 'recall', 'welcome'],
-      learned: ['action', 'recall', 'welcome'],
+      activated: ['learn', 'recall', 'discover'],
+      learned: ['action', 'recall', 'discover'],
       recalled: ['action', 'learn', 'remember']
     }
 
@@ -100,7 +100,7 @@ class PouchStateMachine {
     }
 
     // 默认可转换状态
-    return ['welcome', 'init']
+    return ['discover', 'init']
   }
 
   /**
@@ -109,7 +109,7 @@ class PouchStateMachine {
   async saveState () {
     try {
       // ✅ 修复：检查项目是否已初始化，未初始化时跳过文件保存
-      const ProjectManager = require('~/utils/ProjectManager')
+      const ProjectManager = require('~/project/ProjectManager')
       if (!ProjectManager.isInitialized()) {
         // 项目未初始化，只保存在内存中，不持久化到文件
         return
@@ -142,7 +142,7 @@ class PouchStateMachine {
 
       await fs.writeJson(configPath, config, { spaces: 2 })
     } catch (error) {
-      console.error('保存状态失败:', error)
+      console.error('Failed to save state:', error)
     }
   }
 
@@ -152,7 +152,7 @@ class PouchStateMachine {
   async loadState () {
     try {
       // ✅ 修复：检查项目是否已初始化，未初始化时跳过文件加载
-      const ProjectManager = require('~/utils/ProjectManager')
+      const ProjectManager = require('~/project/ProjectManager')
       if (!ProjectManager.isInitialized()) {
         // 项目未初始化，使用默认内存状态
         return
@@ -183,7 +183,7 @@ class PouchStateMachine {
         }
       }
     } catch (error) {
-      console.error('加载状态失败:', error)
+      console.error('Failed to load state:', error)
     }
   }
 

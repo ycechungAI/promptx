@@ -50,12 +50,12 @@ class PackageDiscovery extends BaseDiscovery {
         }
       }
       
-      logger.info(`[PackageDiscovery] ✅ 从 @promptx/resource 加载了 ${resources.length} 个系统资源`)
+      logger.info(`[PackageDiscovery]  从 @promptx/resource 加载了 ${resources.length} 个系统资源`)
       return resources
 
     } catch (error) {
       // 如果包不存在或加载失败，返回空数组（不阻塞其他发现器）
-      logger.warn(`[PackageDiscovery] ⚠️ 加载 @promptx/resource 失败: ${error.message}`)
+      logger.warn(`[PackageDiscovery]  加载 @promptx/resource 失败: ${error.message}`)
       return []
     }
   }
@@ -87,13 +87,13 @@ class PackageDiscovery extends BaseDiscovery {
       }
       
       if (registryMap.size > 0) {
-        logger.info(`[PackageDiscovery] ✅ 从 @promptx/resource 加载了 ${registryMap.size / 2} 个系统资源到注册表`)
+        logger.info(`[PackageDiscovery]  从 @promptx/resource 加载了 ${registryMap.size / 2} 个系统资源到注册表`)
       }
       
       return registryMap
 
     } catch (error) {
-      logger.warn(`[PackageDiscovery] ⚠️ 系统资源注册表加载失败: ${error.message}`)
+      logger.warn(`[PackageDiscovery]  系统资源注册表加载失败: ${error.message}`)
       return new Map()
     }
   }
@@ -125,7 +125,7 @@ class PackageDiscovery extends BaseDiscovery {
       
       throw new Error('无法找到 @promptx/resource 包的根目录')
     } catch (error) {
-      logger.error(`[PackageDiscovery] ❌ 获取包根目录失败: ${error.message}`)
+      logger.error(`[PackageDiscovery]  获取包根目录失败: ${error.message}`)
       throw error
     }
   }

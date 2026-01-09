@@ -25,8 +25,8 @@ class PouchCLI {
 
     // 批量注册所有命令
     this.registry.registerBatch({
-      init: commands.InitCommand,
-      welcome: commands.WelcomeCommand,
+      project: commands.ProjectCommand,
+      discover: commands.DiscoverCommand,
       action: commands.ActionCommand,
       learn: commands.LearnCommand,
       recall: commands.RecallCommand,
@@ -116,7 +116,7 @@ class PouchCLI {
 
 💡 使用示例:
         ${COMMANDS.INIT}              # 初始化工作环境
-        ${COMMANDS.WELCOME}           # 发现可用角色
+        ${COMMANDS.DISCOVER}          # 发现可用角色
         ${COMMANDS.ACTION} copywriter # 激活文案专家
         ${COMMANDS.LEARN} scrum       # 学习敏捷知识
         ${COMMANDS.RECALL} frontend   # 检索前端记忆
@@ -165,7 +165,7 @@ class PouchCLI {
    * 运行交互式CLI
    */
   async runInteractive () {
-    logger.info('🎯 欢迎使用 PromptX 锦囊系统！')
+    logger.info(' 欢迎使用 PromptX 锦囊系统！')
     logger.info('输入 "help" 查看帮助，"exit" 退出\n')
 
     const readline = require('readline')

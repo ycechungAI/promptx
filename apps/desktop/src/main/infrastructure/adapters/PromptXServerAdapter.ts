@@ -1,12 +1,13 @@
 import { Result, ResultUtil } from '~/shared/Result'
 import { ServerConfig } from '~/main/domain/entities/ServerConfig'
-import { ServerError, ServerErrorCode } from '~/main/domain/errors/ServerErrors'
+import { ServerError } from '~/main/domain/errors/ServerErrors'
 import { ServerStatus } from '~/main/domain/valueObjects/ServerStatus'
 import type { IServerPort, ServerMetrics } from '~/main/domain/ports/IServerPort'
-import { logger } from '~/shared/logger'
+import * as logger from '@promptx/logger'
+import { ServerConfigManager } from '@promptx/config'
 
 // Dynamic import for ESM module
-let FastMCPHttpServer: any
+let PromptXMCPServer: any
 
 export class PromptXServerAdapter implements IServerPort {
   private server: any = null
@@ -15,30 +16,38 @@ export class PromptXServerAdapter implements IServerPort {
 
   async start(config: ServerConfig): Promise<Result<void, ServerError>> {
     try {
-      if (this.server?.status?.running) {
+      if (this.server?.getServer && this.server.getServer().isRunning()) {
         return ResultUtil.fail(ServerError.alreadyRunning())
       }
 
       this.updateStatus(ServerStatus.STARTING)
 
       // Dynamic import @promptx/mcp-server (ESM module)
-      if (!FastMCPHttpServer) {
+      if (!PromptXMCPServer) {
         const mcpServer = await import('@promptx/mcp-server')
-        FastMCPHttpServer = mcpServer.FastMCPHttpServer
+        PromptXMCPServer = mcpServer.PromptXMCPServer
       }
 
-      // Create and start the FastMCP server
-      this.server = new FastMCPHttpServer({
-        host: config.host,
-        port: config.port,
-        debug: config.debug || false,
-        stateless: config.stateless || false
+      // 使用配置管理器作为回退（当 UI 未提供 host/port/debug）
+      const cfg = new ServerConfigManager()
+      const host = config.host ?? cfg.getHost()
+      const port = config.port ?? cfg.getPort()
+      const debug = config.debug ?? cfg.getDebug()
+      const corsEnabled = cfg.getCorsEnabled()
+  
+      // Create and start the PromptX MCP server
+      this.server = new PromptXMCPServer({
+        transport: 'http',
+        host,
+        port,
+        debug,
+        corsEnabled
       })
       
       await this.server.start()
       this.updateStatus(ServerStatus.RUNNING)
       
-      const endpoint = `http://${config.host}:${config.port}/mcp`
+      const endpoint = `http://${host}:${port}/mcp`
       logger.info(`Server running at ${endpoint}`)
 
       return ResultUtil.ok(undefined)
@@ -62,7 +71,7 @@ export class PromptXServerAdapter implements IServerPort {
 
   async stop(): Promise<Result<void, ServerError>> {
     try {
-      if (!this.server?.status?.running) {
+      if (!this.server?.getServer || !this.server.getServer().isRunning()) {
         return ResultUtil.fail(ServerError.notRunning())
       }
 
@@ -88,7 +97,7 @@ export class PromptXServerAdapter implements IServerPort {
   }
 
   async restart(config: ServerConfig): Promise<Result<void, ServerError>> {
-    if (this.server?.status?.running) {
+    if (this.server?.getServer && this.server.getServer().isRunning()) {
       const stopResult = await this.stop()
       if (!stopResult.ok) {
         return stopResult
@@ -103,8 +112,8 @@ export class PromptXServerAdapter implements IServerPort {
       return ResultUtil.ok(ServerStatus.STOPPED)
     }
 
-    // FastMCP使用status.running属性而非isRunning()方法
-    if (this.server.status?.running) {
+    // PromptXMCPServer 使用 isRunning() 方法
+    if (this.server.getServer && this.server.getServer().isRunning()) {
       return ResultUtil.ok(ServerStatus.RUNNING)
     }
     
@@ -112,36 +121,48 @@ export class PromptXServerAdapter implements IServerPort {
   }
 
   async getAddress(): Promise<Result<string, ServerError>> {
-    if (!this.server?.status?.running) {
+    if (!this.server?.getServer || !this.server.getServer().isRunning()) {
       return ResultUtil.fail(ServerError.notRunning())
     }
 
-    const address = `http://${this.server.config.host}:${this.server.config.port}${this.server.config.endpoint}`
+    // PromptXMCPServer 的配置存储在 options 中
+    const host = this.server.options?.host || '127.0.0.1'
+    const port = this.server.options?.port || 5203
+    const address = `http://${host}:${port}/mcp`
     return ResultUtil.ok(address)
   }
 
   async getMetrics(): Promise<Result<ServerMetrics, ServerError>> {
-    if (!this.server?.status?.running) {
+    if (!this.server?.getServer || !this.server.getServer().isRunning()) {
       return ResultUtil.fail(ServerError.notRunning())
     }
 
+    // 从底层服务器获取指标
+    const serverMetrics = this.server.getServer().getMetrics()
     const metrics: ServerMetrics = {
-      uptime: this.server.status.startTime ? Date.now() - this.server.status.startTime : 0,
-      requestCount: this.server.config.metrics?.requestsTotal || 0,
-      activeConnections: this.server.status.connections || 0,
-      memoryUsage: process.memoryUsage()
+      uptime: serverMetrics.uptime || 0,
+      requestCount: serverMetrics.requestCount || 0,
+      activeConnections: serverMetrics.activeConnections || 0,
+      memoryUsage: serverMetrics.memoryUsage || process.memoryUsage()
     }
 
     return ResultUtil.ok(metrics)
   }
 
   async updateConfig(config: Partial<ServerConfig>): Promise<Result<void, ServerError>> {
-    if (!this.server?.status?.running) {
+    if (!this.server?.getServer || !this.server.getServer().isRunning()) {
       return ResultUtil.fail(ServerError.notRunning())
     }
 
+    // PromptXMCPServer 不支持动态更新配置，需要重启
+    // 这里我们只更新内部记录，实际更新需要重启服务器
     try {
-      await this.server.updateConfig(config)
+      logger.warn('Configuration update requires server restart to take effect')
+      // 保存新配置以备重启时使用
+      if (config.host !== undefined) this.server.options.host = config.host
+      if (config.port !== undefined) this.server.options.port = config.port
+      if (config.debug !== undefined) this.server.options.debug = config.debug
+      
       return ResultUtil.ok(undefined)
     } catch (error) {
       if (error instanceof Error) {
@@ -169,7 +190,8 @@ export class PromptXServerAdapter implements IServerPort {
       try {
         listener(status)
       } catch (error) {
-        logger.error('Error in status listener:', error)
+        const err = String(error)
+        logger.error('Error in status listener:', err)
       }
     })
   }

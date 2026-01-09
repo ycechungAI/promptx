@@ -1,9 +1,10 @@
 const logger = require('@promptx/logger');
 const Network = require('./Network');
 const Remember = require('./Remember');
-const Recall = require('./Recall');
 const Prime = require('./Prime');
+const Memory = require('./Memory');
 const { TemperatureWeightStrategy } = require('./WeightStrategy');
+const TwoPhaseRecallStrategy = require('./TwoPhaseRecallStrategy');
 
 /**
  * CognitionSystem - 认知系统主控制器
@@ -109,9 +110,15 @@ class CognitionSystem {
     
     /**
      * Recall引擎实例（延迟创建）
-     * @type {Recall|null}
+     * @type {TwoPhaseRecallStrategy|null}
      */
     this.recallEngine = null;
+    
+    /**
+     * Memory存储实例（延迟创建）
+     * @type {Memory|null}
+     */
+    this.memory = null;
     
     logger.info('[CognitionSystem] Initialized', {
       dataPath: this.dataPath,
@@ -133,35 +140,87 @@ class CognitionSystem {
   
   /**
    * 获取Recall引擎（懒加载）
-   * 
-   * @returns {Recall}
+   *
+   * @returns {TwoPhaseRecallStrategy}
    */
   getRecallEngine() {
     if (!this.recallEngine) {
-      this.recallEngine = new Recall(this.network, this.recallOptions);
+      // 使用新的两阶段召回策略
+      this.recallEngine = new TwoPhaseRecallStrategy({
+        // 第一阶段配置
+        maxActivations: this.recallOptions.maxActivations || 100,
+        // 第二阶段配置
+        typeWeights: this.recallOptions.typeWeights || {
+          'PATTERN': 2.0,
+          'LINK': 1.5,
+          'ATOMIC': 1.0
+        },
+        typeQuotas: this.recallOptions.typeQuotas || {
+          'PATTERN': 10,
+          'LINK': 15,
+          'ATOMIC': 25
+        },
+        totalLimit: this.recallOptions.totalLimit || 50,
+        // 传递权重策略
+        activationStrategy: this.recallOptions.activationStrategy,
+        weightFactors: this.recallOptions.weightFactors
+      });
+
+      // 注入依赖
+      this.recallEngine.setDependencies(this.network, this.getMemory());
     }
     return this.recallEngine;
+  }
+  
+  /**
+   * 获取Memory存储（懒加载）
+   * 
+   * @returns {Memory|null} Memory实例，如果没有directory则返回null
+   */
+  getMemory() {
+    if (!this.memory && this.network.directory) {
+      const path = require('path');
+      const memoryPath = path.join(this.network.directory, 'engrams.db');
+      this.memory = new Memory(memoryPath);
+    }
+    return this.memory;
   }
   
   /**
    * 记忆操作
    * 
    * 执行流程：
-   * 1. 调用Remember引擎处理Engram
-   * 2. 自动保存到磁盘
+   * 1. 存储Engram到Memory（使用engram.id）
+   * 2. 调用Remember引擎处理Schema连接
+   * 3. 建立Cue到Engram.id的反向索引
    * 
    * @param {Engram} engram - 记忆痕迹对象
-   * @returns {Object} 记忆结果
+   * @returns {Promise<Object>} 记忆结果
    */
-  remember(engram) {
+  async remember(engram) {
     logger.debug('[CognitionSystem] Remember operation', {
+      id: engram.id,
       schemaLength: engram.length,
       strength: engram.strength,
       preview: engram.getPreview()
     });
     
+    // 存储到Memory（使用engram.id作为key）
+    if (this.getMemory()) {
+      try {
+        await this.getMemory().store(engram);
+        logger.debug('[CognitionSystem] Stored engram to memory', { id: engram.id });
+      } catch (error) {
+        logger.error('[CognitionSystem] Failed to store engram to memory', { 
+          id: engram.id,
+          error: error.message 
+        });
+        throw error;
+      }
+    }
+    
     const remember = this.getRememberEngine();
-    const result = remember.execute(engram);
+    const result = remember.execute(engram, engram.id);
     
     // 注意：持久化由CognitionManager.saveSystem()负责
     // 这里不再自动保存，避免路径冲突
@@ -171,30 +230,115 @@ class CognitionSystem {
   
   /**
    * 回忆操作
-   * 
+   *
    * 执行流程：
    * 1. 调用Recall引擎激活网络
-   * 2. 更新被激活节点的频率
-   * 3. 返回激活的Mind
-   * 
+   * 2. 加载与原始查询相关的Engrams
+   * 3. 更新被激活节点的频率
+   * 4. 返回激活的Mind（包含engrams）
+   *
    * @param {string} word - 起始概念
-   * @returns {Mind|null} 激活的认知网络
+   * @param {Object} options - 可选参数
+   * @param {string} options.mode - 认知激活模式 ('creative' | 'balanced' | 'focused')
+   * @returns {Promise<Mind|null>} 激活的认知网络
    */
-  recall(word) {
-    logger.debug('[CognitionSystem] Recall operation', { word });
-    
-    const recall = this.getRecallEngine();
-    const mind = recall.execute(word);
-    
+  async recall(word, options = {}) {
+    const mode = options.mode || 'balanced';
+    logger.debug('[CognitionSystem] Recall operation', { word, mode });
+
+    // 如果指定了 mode，创建新的引擎实例
+    let recallEngine;
+    if (mode && mode !== 'balanced') {
+      const TwoPhaseRecallStrategy = require('./TwoPhaseRecallStrategy');
+      recallEngine = new TwoPhaseRecallStrategy({ mode });
+      recallEngine.setDependencies(this.network, this.getMemory());
+      logger.info('[CognitionSystem] Created recall engine with mode', { mode });
+    } else {
+      recallEngine = this.getRecallEngine();
+    }
+
+    // 使用新的两阶段召回策略
+    // TwoPhaseRecallStrategy已经在内部处理了engrams的加载和排序
+    const mind = await recallEngine.recall(word);
+
+    if (!mind) {
+      return null;
+    }
+
     // 更新频率
-    if (mind && mind.activatedCues.size > 0) {
+    if (mind.activatedCues.size > 0) {
       this.network.updateRecallFrequency(mind.activatedCues);
       logger.debug('[CognitionSystem] Updated frequencies after recall', {
-        activatedCount: mind.activatedCues.size
+        activatedCount: mind.activatedCues.size,
+        engramCount: mind.engrams?.length || 0
+      });
+    }
+
+    return mind;
+  }
+  
+  /**
+   * 加载与查询词直接相关的Engrams
+   * 
+   * @param {Mind} mind - Mind对象
+   * @param {string} originalQuery - 原始查询词
+   * @returns {Promise<void>}
+   */
+  async loadEngrams(mind, originalQuery) {
+    mind.engrams = [];
+    
+    // Debug logging for loadEngrams process
+    logger.info('[CognitionSystem] DEBUG - loadEngrams process:', {
+      originalQuery,
+      networkCuesSize: this.network.cues.size,
+      hasMemorySystem: !!this.getMemory(),
+      networkCuesKeys: Array.from(this.network.cues.keys())
+    });
+    
+    // 只加载与原始查询词直接相关的engrams
+    const queryCue = this.network.cues.get(originalQuery);
+    
+    logger.info('[CognitionSystem] DEBUG - queryCue lookup:', {
+      originalQuery,
+      hasQueryCue: !!queryCue,
+      queryCueMemories: queryCue?.memories,
+      memoriesLength: queryCue?.memories?.length
+    });
+    
+    if (queryCue && queryCue.memories) {
+      for (const engramId of queryCue.memories) {
+        const engramData = await this.getMemory().get(engramId);
+        
+        logger.debug('[CognitionSystem] DEBUG - loading engram:', {
+          engramId,
+          hasEngramData: !!engramData,
+          engramContent: engramData?.content?.substring(0, 50)
+        });
+        
+        if (engramData) {
+          mind.engrams.push({
+            id: engramData.id,
+            content: engramData.content,
+            schema: engramData.schema,
+            strength: engramData.strength,
+            type: engramData.type,  // 添加type字段
+            timestamp: engramData.timestamp,
+            activatedBy: originalQuery
+          });
+        }
+      }
+    } else {
+      logger.info('[CognitionSystem] DEBUG - No engrams loaded - reason:', {
+        hasQueryCue: !!queryCue,
+        hasMemories: !!queryCue?.memories,
+        query: originalQuery
       });
     }
     
-    return mind;
+    logger.debug('[CognitionSystem] Loaded engrams', { 
+      query: originalQuery,
+      engramCount: mind.engrams.length 
+    });
   }
   
   /**
@@ -207,7 +351,7 @@ class CognitionSystem {
    * 
    * @returns {Mind|null} 预热的认知网络
    */
-  prime() {
+  async prime() {
     logger.debug('[CognitionSystem] Prime operation');
     
     // 注意：数据加载已由CognitionManager.getSystem()完成
@@ -227,8 +371,26 @@ class CognitionSystem {
     
     logger.info('[CognitionSystem] Prime completed', {
       activatedNodes: mind.activatedCues?.size || 0,
-      connections: mind.connections?.length || 0
+      connections: mind.connections?.length || 0,
+      centerWord: mind.centerWord
     });
+    
+    // 加载与prime中心词相关的engrams
+    if (this.getMemory() && mind.centerWord) {
+      try {
+        await this.loadEngrams(mind, mind.centerWord);
+        logger.info('[CognitionSystem] Loaded engrams for prime center word', {
+          centerWord: mind.centerWord,
+          engramCount: mind.engrams?.length || 0
+        });
+      } catch (error) {
+        logger.error('[CognitionSystem] Failed to load engrams for prime', { 
+          centerWord: mind.centerWord,
+          error: error.message 
+        });
+        // 不影响prime的核心功能，继续执行
+      }
+    }
     
     // Prime时不更新频率，因为这是系统自动触发的
     
