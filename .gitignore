@@ -1,3 +1,6 @@
+# Project-specific
+CLAUDE.md
+
 # Dependencies
 node_modules/
 npm-debug.log*
@@ -80,6 +83,7 @@ temp/
 # PromptX local development directories
 .promptx/
 .serena/
+.claude/
 
 /.idea/
 /.vscode/
@@ -101,3 +105,4 @@ temp/
 temp/
 tmp/
 .changeset/prerelease.lock
+.secrets

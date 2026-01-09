@@ -1,6 +1,6 @@
 {
   "name": "@promptx/core",
-  "version": "1.11.0",
+  "version": "1.27.7",
   "description": "Core library for PromptX - DPML-powered AI prompt framework",
   "main": "dist/index.js",
   "type": "commonjs",
@@ -33,16 +33,20 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@npmcli/arborist": "^8.0.1",
     "@promptx/logger": "workspace:*",
     "@promptx/resource": "workspace:*",
+    "ajv": "^8.17.1",
+    "better-sqlite3": "^12.4.1",
     "env-paths": "2.2.1",
     "eta": "^3.5.0",
+    "execa": "^9.5.2",
+    "extract-comments": "^1.1.0",
     "fs-extra": "^11.3.0",
     "glob": "^10.4.5",
     "peggy": "^5.0.5",
     "pnpm": "^10.0.0"
   },
-  "devDependencies": {},
   "files": [
     "dist/**/*",
     "README.md"
@@ -50,5 +54,8 @@
   "publishConfig": {
     "access": "public"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {
+    "@alicloud/openapi-client": "^0.4.15"
+  }
 }

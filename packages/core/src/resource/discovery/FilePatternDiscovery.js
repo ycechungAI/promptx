@@ -232,13 +232,13 @@ class FilePatternDiscovery extends BaseDiscovery {
     try {
       const content = await fs.readFile(filePath, 'utf8')
       const trimmedContent = content.trim()
-      
+
       if (trimmedContent.length === 0) {
         return false
       }
 
-      // 检查DPML标签
-      return trimmedContent.includes('<role>') && trimmedContent.includes('</role>')
+      // 检查DPML标签（支持带属性的标签）
+      return /<role[\s>]/.test(trimmedContent) && trimmedContent.includes('</role>')
     } catch (error) {
       return false
     }
@@ -253,12 +253,12 @@ class FilePatternDiscovery extends BaseDiscovery {
     try {
       const content = await fs.readFile(filePath, 'utf8')
       const trimmedContent = content.trim()
-      
+
       if (trimmedContent.length === 0) {
         return false
       }
 
-      return trimmedContent.includes('<thought>') && trimmedContent.includes('</thought>')
+      return /<thought[\s>]/.test(trimmedContent) && trimmedContent.includes('</thought>')
     } catch (error) {
       return false
     }
@@ -273,12 +273,12 @@ class FilePatternDiscovery extends BaseDiscovery {
     try {
       const content = await fs.readFile(filePath, 'utf8')
       const trimmedContent = content.trim()
-      
+
       if (trimmedContent.length === 0) {
         return false
       }
 
-      return trimmedContent.includes('<execution>') && trimmedContent.includes('</execution>')
+      return /<execution[\s>]/.test(trimmedContent) && trimmedContent.includes('</execution>')
     } catch (error) {
       return false
     }
@@ -340,13 +340,13 @@ class FilePatternDiscovery extends BaseDiscovery {
     try {
       const content = await fs.readFile(filePath, 'utf8')
       const trimmedContent = content.trim()
-      
+
       if (trimmedContent.length === 0) {
         return false
       }
 
-      // Manual文件应该包含<manual>标签或者至少有一定的内容
-      return trimmedContent.includes('<manual>') || trimmedContent.length > 50
+      // Manual文件应该包含<manual>标签（支持带属性的标签）或者至少有一定的内容
+      return /<manual[\s>]/.test(trimmedContent) || trimmedContent.length > 50
     } catch (error) {
       return false
     }
@@ -371,11 +371,11 @@ class FilePatternDiscovery extends BaseDiscovery {
         await registryData.save()
       }
       
-      logger.info(`[${this.source}] ✅ 注册表生成完成，共发现 ${registryData.size} 个资源`)
+      logger.info(`[${this.source}]  注册表生成完成，共发现 ${registryData.size} 个资源`)
       return registryData
       
     } catch (error) {
-      logger.error(`[${this.source}] ❌ 注册表生成失败: ${error.message}`)
+      logger.error(`[${this.source}]  注册表生成失败: ${error.message}`)
       throw error
     }
   }

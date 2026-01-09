@@ -166,7 +166,7 @@ class CognitionManager {
         nodeCount: anchoredState.metadata?.nodeCount
       });
       
-      mind = system.recall(anchoredState.centerWord);
+      mind = await system.recall(anchoredState.centerWord);
       
       if (mind) {
         logger.info(`[CognitionManager] Successfully primed from anchored state: "${anchoredState.centerWord}"`);
@@ -176,7 +176,7 @@ class CognitionManager {
     // 如果没有锚定状态或恢复失败，执行常规prime
     if (!mind) {
       logger.debug(`[CognitionManager] No anchored state or recovery failed, using regular prime`);
-      mind = system.prime();
+      mind = await system.prime();
     }
     
     if (!mind) {
@@ -198,31 +198,43 @@ class CognitionManager {
    * 每次recall后自动锚定状态
    * @param {string} roleId - 角色ID
    * @param {string} query - 查询词
-   * @returns {Mind} Mind 对象
+   * @param {Object} options - 可选参数
+   * @param {string} options.mode - 认知激活模式 ('creative' | 'balanced' | 'focused')
+   * @returns {Promise<Mind>} Mind 对象（包含engrams）
    */
-  async recall(roleId, query) {
-    logger.info(`[CognitionManager] Recall for role: ${roleId}, query: "${query}"`);
-    
+  async recall(roleId, query, options = {}) {
+    const mode = options.mode || 'balanced';
+    logger.info(`[CognitionManager] Recall for role: ${roleId}, query: "${query}", mode: ${mode}`);
+
     const system = await this.getSystem(roleId);
-    
-    // 执行recall
-    const mind = system.recall(query);
-    
+
+    // 执行recall（现在是异步的，会加载engrams），传入 mode 参数
+    const mind = await system.recall(query, { mode });
+
     if (!mind) {
       logger.warn(`[CognitionManager] Recall returned null for role: ${roleId}, query: ${query}`);
       return null;
     }
-    
-    // 自动锚定当前认知状态
-    try {
-      const anchor = new Anchor(system.network);
-      await anchor.execute(query, mind);
-      logger.debug(`[CognitionManager] Auto-anchored state after recall: "${query}"`);
-    } catch (error) {
-      logger.error(`[CognitionManager] Failed to auto-anchor state:`, error);
-      // 锚定失败不影响recall结果
+
+    // 自动锚定当前认知状态（仅当recall成功激活了节点）
+    if (mind && mind.activatedCues && mind.activatedCues.size > 0) {
+      try {
+        const anchor = new Anchor(system.network);
+        await anchor.execute(query, mind);
+        logger.debug(`[CognitionManager] Auto-anchored state after recall: "${query}"`, {
+          activatedNodes: mind.activatedCues.size
+        });
+      } catch (error) {
+        logger.error(`[CognitionManager] Failed to auto-anchor state:`, error);
+        // 锚定失败不影响recall结果
+      }
+    } else {
+      logger.debug(`[CognitionManager] Skip anchoring - recall returned empty mind`, {
+        query,
+        hasActivatedCues: mind?.activatedCues?.size || 0
+      });
     }
-    
+
     return mind;
   }
 
@@ -244,6 +256,7 @@ class CognitionManager {
           content: engramData.content,
           schema: engramData.schema,
           strength: engramData.strength,
+          type: engramData.type,  // 传递type字段
           timestamp: Date.now()  // 使用当前时间戳
         });
         
@@ -252,8 +265,8 @@ class CognitionManager {
           continue;
         }
         
-        // 传递Engram对象给system.remember
-        system.remember(engram);
+        // CognitionSystem现在会自动处理Memory存储
+        await system.remember(engram);
         
         logger.debug(`[CognitionManager] Processed engram:`, {
           preview: engram.getPreview(),
@@ -262,6 +275,8 @@ class CognitionManager {
         
       } catch (error) {
         logger.error(`[CognitionManager] Failed to process engram:`, error);
+        // 重新抛出错误，让上层感知到失败
+        throw error;
       }
     }
     
@@ -278,19 +293,28 @@ class CognitionManager {
    */
   parseSchema(schema) {
     if (!schema) return [];
-    
-    // 按行分割，处理缩进层级
-    const lines = schema.split('\n').filter(line => line.trim());
-    const concepts = [];
-    
-    for (const line of lines) {
-      // 移除缩进和特殊符号，提取概念
-      const concept = line.trim().replace(/^[-*>#\s]+/, '').trim();
-      if (concept) {
-        concepts.push(concept);
+
+    // 支持多种分隔符：优先使用 - 分隔符
+    let concepts = [];
+
+    if (schema.includes(' - ')) {
+      // 用 - 分割（标准格式）
+      concepts = schema.split(/\s*-\s*/).filter(c => c.trim());
+    } else if (schema.includes('\n')) {
+      // 兼容旧格式：用换行符分割
+      const lines = schema.split('\n').filter(line => line.trim());
+      for (const line of lines) {
+        // 移除缩进和特殊符号，提取概念
+        const concept = line.trim().replace(/^[-*>#\s]+/, '').trim();
+        if (concept) {
+          concepts.push(concept);
+        }
       }
+    } else {
+      // 如果没有分隔符，尝试用空格分割
+      concepts = schema.split(/\s+/).filter(c => c.trim());
     }
-    
+
     return concepts;
   }
 

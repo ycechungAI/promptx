@@ -1,5 +1,165 @@
 # @promptx/logger
 
+## 1.27.7
+
+## 1.27.6
+
+## 1.27.5
+
+### Patch Changes
+
+- [#511](https://github.com/Deepractice/PromptX/pull/511) [`e09b76d`](https://github.com/Deepractice/PromptX/commit/e09b76dcaf3e3e8c57cb9bb9f12d4133b3e665f5) Thanks [@dfwgj](https://github.com/dfwgj)! - feat: single instance lock and UX improvements
+
+  - Add single instance lock to prevent multiple app instances
+  - Auto open main window on startup for better UX
+  - Focus existing window when user clicks shortcut while app is running
+  - Add resource type validation framework for import
+  - Fix logger file lock issue with graceful fallback to console
+  - Fix logs list refresh after clearing all logs
+
+## 1.27.4
+
+## 1.27.3
+
+## 1.27.2
+
+## 1.27.1
+
+## 1.27.0
+
+## 1.26.0
+
+## 1.25.2
+
+## 1.25.1
+
+## 1.25.0
+
+## 1.24.1
+
+## 1.24.0
+
+## 1.23.4
+
+## 1.23.3
+
+## 1.23.2
+
+## 1.23.1
+
+## 1.23.0
+
+### Patch Changes
+
+- [#411](https://github.com/Deepractice/PromptX/pull/411) [`df8140b`](https://github.com/Deepractice/PromptX/commit/df8140ba9a4d6715ba21d9fe0c37d92ee8db5127) Thanks [@deepracticexs](https://github.com/deepracticexs)! - feat: 认知激活模式系统与 recall 工具增强
+
+  ## 新增功能
+
+  ### 认知激活模式 (Cognitive Activation Modes)
+
+  - 实现三种认知激活模式:Creative(创造性探索)、Balanced(平衡模式)、Focused(聚焦检索)
+  - 基于学术研究(ACT-R、探索-利用理论、双过程理论)设计参数体系
+  - 支持通过 recall 工具的 mode 参数切换激活模式
+  - 不同模式通过调节 firingThreshold、maxCycles、synapticDecay 等参数控制激活扩散行为
+
+  ### Recall 工具增强
+
+  - 严格限制 recall 必须使用记忆网络中实际存在的词汇
+  - 优化工具提示词,强制执行"action 查看网络图 → 选择已存在的词 → recall"工作流
+  - 添加明确的失败处理指导,禁止 AI 推测或抽象不存在的词
+
+  ## 修复
+
+  ### 状态锚定 bug 修复
+
+  - 修复空 Mind 对象被错误锚定导致状态污染的问题
+  - 添加系统级防御:仅当 recall 成功激活节点时才保存状态
+  - 防止 AI 违规使用不存在词汇导致的状态损坏
+
+  ### 其他修复
+
+  - 修复 TwoPhaseRecallStrategy 错误使用 centerCue 导致激活失败的 bug
+  - 改进 logger API 支持自然顺序参数 logger.info(msg, obj)
+  - 添加详细的 mode 参数传递日志便于调试
+
+  ## 技术细节
+
+  认知模式参数对比:
+
+  - Creative: firingThreshold=0.05, maxCycles=12, 广泛联想
+  - Balanced: firingThreshold=0.1, maxCycles=8, 系统默认
+  - Focused: firingThreshold=0.2, maxCycles=4, 精确检索
+
+## 1.22.0
+
+## 1.21.0
+
+## 1.20.0
+
+## 1.19.0
+
+## 1.18.0
+
+## 1.17.3
+
+## 1.17.2
+
+## 1.17.1
+
+## 1.17.0
+
+## 1.16.0
+
+## 1.15.1
+
+## 1.15.0
+
+## 1.14.2
+
+## 1.14.1
+
+## 1.14.0
+
+## 1.13.0
+
+## 1.12.0
+
+### Patch Changes
+
+- [`2c503d8`](https://github.com/Deepractice/PromptX/commit/2c503d80bb09511ab94e24b015a5c21dea8d4d9b) Thanks [@deepracticexs](https://github.com/deepracticexs)! - ## @promptx/resource
+
+  ### 新功能
+
+  - 添加 `promptx-log-viewer` 工具，用于查询和分析 PromptX 系统日志
+    - 支持时间范围查询（相对时间如 "30m", "2h" 或绝对时间）
+    - 支持日志级别过滤（trace, debug, info, warn, error, fatal）
+    - 支持关键词、包名、文件名、进程 ID 等多维度过滤
+    - 返回结果同时包含 UTC 时间和本地时间显示
+    - 专为 AI 诊断系统问题设计，返回结构化 JSON 数据
+
+  ### 改进
+
+  - 修复 Luban 角色的工具创建路径文档，明确用户级工具存储在 `resource/tool/` 目录
+
+  ## @promptx/logger
+
+  ### 修复
+
+  - 优化 Electron 环境下的日志处理，避免 worker thread 问题
+  - 改进日志格式，确保与 promptx-log-viewer 工具的兼容性
+
+  ## 其他改进
+
+  ### 构建系统
+
+  - 更新 Turbo 配置，添加 `resources/**` 和 `scripts/**` 到构建输入监控
+  - 确保资源文件修改能正确触发重新构建，避免缓存问题
+
+  ### Git Hooks
+
+  - 修复 Windows Git Bash 环境下 lefthook commit-msg 钩子的兼容性问题
+  - 简化 commitlint 命令，避免多行脚本解析错误
+
 ## 1.11.0
 
 ### Minor Changes

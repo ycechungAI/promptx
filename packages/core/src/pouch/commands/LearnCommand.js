@@ -2,9 +2,8 @@ const BasePouchCommand = require('../BasePouchCommand')
 const { getGlobalResourceManager } = require('../../resource')
 const DPMLContentParser = require('../../dpml/DPMLContentParser')
 const SemanticRenderer = require('../../dpml/SemanticRenderer')
-const ProjectManager = require('~/utils/ProjectManager')
-const { getGlobalProjectManager } = require('~/utils/ProjectManager')
-const { getGlobalServerEnvironment } = require('~/utils/ServerEnvironment')
+const ProjectManager = require('~/project/ProjectManager')
+const { getGlobalProjectManager } = require('~/project/ProjectManager')
 const { COMMANDS } = require('~/constants')
 
 /**
@@ -192,7 +191,7 @@ ${errorMessage}
 
 ## 🔍 发现可学习资源
 - 使用 MCP PromptX action 工具查看角色需要的所有资源
-- 使用 MCP PromptX welcome 工具查看可用角色列表`
+- 使用 MCP PromptX discover 工具查看可用角色列表`
   }
 
   /**
@@ -204,12 +203,12 @@ ${errorMessage}
     if (!resourceUrl) {
       return {
         currentState: 'learn_awaiting_resource',
-        availableTransitions: ['welcome', 'action'],
+        availableTransitions: ['discover', 'action'],
         nextActions: [
           {
             name: '查看可用角色',
             description: '返回角色选择页面',
-            method: 'MCP PromptX welcome 工具',
+            method: 'MCP PromptX discover 工具',
             priority: 'high'
           },
           {
@@ -226,7 +225,7 @@ ${errorMessage}
     if (!urlMatch) {
       return {
         currentState: 'learn_error',
-        availableTransitions: ['welcome', 'action'],
+        availableTransitions: ['discover', 'action'],
         nextActions: [
           {
             name: '查看使用帮助',
@@ -242,7 +241,7 @@ ${errorMessage}
 
     return {
       currentState: `learned_${protocol}`,
-      availableTransitions: ['learn', 'recall', 'welcome', 'action'],
+      availableTransitions: ['learn', 'recall', 'discover', 'action'],
       nextActions: [
         {
           name: '继续学习',
@@ -300,11 +299,7 @@ ${errorMessage}
    * 检测MCP进程ID
    */
   detectMcpId() {
-    const serverEnv = getGlobalServerEnvironment()
-    if (serverEnv.isInitialized()) {
-      return serverEnv.getMcpId()
-    }
-    return ProjectManager.generateMcpId()
+    return ProjectManager.getCurrentMcpId()
   }
 
   /**

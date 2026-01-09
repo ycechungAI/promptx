@@ -1,0 +1,284 @@
+{
+  "settings": {
+    "title": "Settings",
+    "subtitle": "Customize your PromptX experience",
+    "language": {
+      "title": "Language",
+      "description": "Choose your preferred language",
+      "english": "English",
+      "chinese": "简体中文"
+    },
+    "autoStart": {
+      "title": "Auto Start",
+      "description": "Launch PromptX automatically when computer starts",
+      "enable": "Enable auto start"
+    },
+    "server": {
+      "title": "Server Configuration",
+      "description": "Configure server host, port and debug settings",
+      "host": {
+        "label": "Server Host",
+        "placeholder": "127.0.0.1",
+        "description": "Host address for the server to listen on, e.g. 127.0.0.1"
+      },
+      "port": {
+        "label": "Server Port",
+        "placeholder": "5203",
+        "description": "Port for the server to listen on, range 1-65535"
+      },
+      "debug": {
+        "label": "Debug Mode",
+        "description": "Output more log information for troubleshooting"
+      },
+      "save": "Save Configuration",
+      "saving": "Saving...",
+      "reset": "Reset to Default"
+    }
+  },
+  "logs": {
+    "title": "Application Logs",
+    "subtitle": "View and manage application logs",
+    "management": "Logs Management",
+    "description": "View, filter, and manage application logs",
+    "search": {
+      "placeholder": "Search logs..."
+    },
+    "filters": {
+      "all": "All",
+      "normal": "Normal",
+      "error": "Error",
+      "clearDate": "Clear"
+    },
+    "list": {
+      "title": "Log Files",
+      "count": "Log Files ({{count}})",
+      "empty": "No logs found"
+    },
+    "viewer": {
+      "selectPrompt": "Select a log file to view its content",
+      "loading": "Loading...",
+      "empty": "Log is empty"
+    },
+    "actions": {
+      "clearAll": "Clear All",
+      "delete": "Delete"
+    },
+    "messages": {
+      "loadFailed": "Failed to load logs",
+      "readFailed": "Failed to read log",
+      "deleteFailed": "Failed to delete log",
+      "deleteSuccess": "Log deleted successfully",
+      "deleteConfirm": "Delete log file: {{name}}?",
+      "clearAllConfirm": "Are you sure you want to delete ALL log files?",
+      "clearSuccess": "Cleared {{count}} log files",
+      "clearFailed": "Failed to clear logs"
+    }
+  },
+  "resources": {
+    "search": {
+      "placeholder": "Search resources / roles / tools"
+    },
+    "import": {
+      "title": "Import Resource",
+      "description": "Import a role or tool from a file or URL",
+      "button": "Import Resource",
+      "methods": {
+        "file": "File Import",
+        "url": "URL Import (Coming Soon)"
+      },
+      "fields": {
+        "resourceType": "Resource Type",
+        "zipFile": "ZIP File",
+        "browse": "Browse",
+        "upload": "Upload",
+        "customId": "Custom ID (Optional)",
+        "customIdPlaceholder": "Leave empty to use original ID",
+        "customIdHint": "The ID will be used as the folder name",
+        "customName": "Custom Name (Optional)",
+        "customNamePlaceholder": "Display name for the resource",
+        "customDescription": "Custom Description (Optional)",
+        "customDescriptionPlaceholder": "Brief description of the resource"
+      },
+      "actions": {
+        "cancel": "Cancel",
+        "import": "Import",
+        "importing": "Importing..."
+      },
+      "messages": {
+        "selectFile": "Please select a file",
+        "importSuccess": "Resource imported successfully",
+        "importFailed": "Failed to import resource",
+        "invalidStructure": "Invalid resource structure",
+        "fileNotFound": "File not found",
+        "resourceExists": "Resource exists",
+        "resourceExistsMessage": "Resource \"{{id}}\" already exists. Overwrite?",
+        "cancelled": "Operation cancelled"
+      },
+      "urlComingSoon": "URL import feature is coming soon..."
+    },
+    "cards": {
+      "roles": {
+        "title": "Roles",
+        "description": "Number of activatable roles"
+      },
+      "tools": {
+        "title": "Tools", 
+        "description": "Number of executable tools"
+      },
+      "sources": {
+        "title": "Sources",
+        "description": "Resource count by source"
+      }
+    },
+    "filters": {
+      "type": "Type:",
+      "source": "Source:",
+      "all": "All",
+      "roles": "Roles",
+      "tools": "Tools",
+      "system": "System",
+      "user": "User"
+    },
+    "actions": {
+      "edit": "Edit",
+      "download": "Download",
+      "delete": "Delete"
+    },
+    "messages": {
+      "loadFailed": "Failed to load resources",
+      "searchFailed": "Search failed",
+      "downloadSuccess": "Saved to: {{path}}",
+      "downloadFailed": "Download failed",
+      "deleteConfirm": "Confirm delete {{type}} \"{{name}}\"? This action cannot be undone.",
+      "deleteSuccess": "Deleted successfully",
+      "deleteFailed": "Delete failed",
+      "deleteOnlyUser": "Only user resources can be deleted (system/project cannot be deleted)",
+      "noMore": "No more items :-I",
+      "editOnlyUser": "Only user resources can be edited "
+    },
+    "types": {
+      "role": "Role",
+      "tool": "Tool"
+    },
+    "editor": {
+      "title": "Edit {{type}}: {{name}}",
+      "fields": {
+        "name": "Name",
+        "description": "Description",
+        "namePlaceholder": "Enter resource name",
+        "descriptionPlaceholder": "Enter resource description"
+      },
+      "fileList": "File List",
+      "editFile": "Edit: {{file}}",
+      "selectFile": "Please select a file",
+      "fileContent": "File content...",
+      "selectFilePrompt": "Please select a file to edit from the left",
+      "buttons": {
+        "saveResourceInfo": "Save Resource Info",
+        "saveFile": "Save File",
+        "close": "Close",
+        "saving": "Saving...",
+        "copyPrompt": "Copy Prompt",
+        "copySuccess": "Prompt copied to clipboard"
+      },
+      "messages": {
+        "loadFilesFailed": "Failed to load file list",
+        "readFileFailed": "Failed to read file",
+        "editorOpenFailed": "Failed to open editor",
+        "saveFailed": "Save failed",
+        "saveSuccess": "Saved successfully",
+        "resourceInfoSaveSuccess": "Resource info saved successfully",
+        "saveResourceInfoFailed": "Failed to save resource info",
+        "onlyUserEditable": "Only user resources can be edited (system/project are read-only)",
+        "loading": "Loading...",
+        "loadingFileContent": "Loading file content..."
+      },
+      "tabs": {
+        "editor": "Editor",
+        "preview": "Preview"
+      },
+      "preview": {
+        "loading": "Loading preview...",
+        "empty": "No preview content",
+        "failed": "Failed to load preview"
+      },
+      "readOnly": "⚠️ This resource is in read-only mode ({{source}})"
+    }
+  },
+  "tray": {
+    "tooltip": "PromptX Desktop",
+    "status": {
+      "running": "Running",
+      "stopped": "Stopped",
+      "starting": "Starting...",
+      "stopping": "Stopping...",
+      "error": "Error",
+      "unknown": "Unknown"
+    },
+    "menu": {
+      "status": "Status: {{status}}",
+      "startServer": "Start Server",
+      "stopServer": "Stop Server",
+      "toggleServer": "Toggle Server",
+      "copyAddress": "Copy Server Address",
+      "openMainWindow": "Open Main Window",
+      "manageResources": "Manage Resources",
+      "showLogs": "Show Logs",
+      "settings": "Settings...",
+      "checkUpdates": "Check for Updates...",
+      "checkingUpdates": "Checking for Updates...",
+      "downloadUpdate": "Download Update ({{version}})",
+      "downloading": "Downloading... {{percent}}%",
+      "installUpdate": "Install Update ({{version}})",
+      "retryUpdate": "Retry Update Check",
+      "about": "About PromptX",
+      "quit": "Quit PromptX"
+    },
+    "windows": {
+      "logs": "PromptX Logs",
+      "settings": "PromptX Settings"
+    }
+  },
+  "messages": {
+    "autoStartEnabled": "Auto start enabled successfully",
+    "autoStartDisabled": "Auto start disabled successfully",
+    "autoStartError": "Failed to toggle auto start",
+    "configSaved": "Configuration saved successfully",
+    "configSaveError": "Failed to save configuration",
+    "configReset": "Configuration reset to default",
+    "configResetError": "Failed to reset configuration",
+    "loadError": "Failed to load settings, please try again",
+    "languageChanged": "Language changed successfully"
+  },
+  "sidebar": {
+    "resources": "Resources",
+    "logs": "Logs",
+    "settings": "Settings",
+    "update": "Check for Updates"
+  },
+  "update": {
+    "title": "Software Update",
+    "description": "Check for and install software updates",
+    "currentVersion": "Current Version",
+    "checkNow": "Check Now",
+    "checking": "Checking...",
+    "upToDate": "You're up to date!",
+    "upToDateMessage": "You're running the latest version",
+    "newVersion": "New Version Available",
+    "download": "Download",
+    "downloading": "Downloading...",
+    "downloadComplete": "Download complete",
+    "readyToInstall": "Update ready to install",
+    "installNow": "Install Now",
+    "releaseNotes": "What's New",
+    "checkFailed": "Failed to check for updates",
+    "downloadFailed": "Failed to download update",
+    "installFailed": "Failed to install update",
+    "errorMessage": "An error occurred while checking for updates"
+  },
+  "datePicker": {
+    "placeholder": "Select date",
+    "selectDate": "Select Date",
+    "clear": "Clear"
+  }
+}

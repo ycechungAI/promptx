@@ -1,6 +1,6 @@
 {
   "name": "@promptx/mcp-server",
-  "version": "1.11.0",
+  "version": "1.27.7",
   "description": "MCP Server implementation for PromptX",
   "type": "module",
   "main": "./dist/index.js",
@@ -12,7 +12,7 @@
     }
   },
   "bin": {
-    "mcp-server": "./dist/bin/mcp-server.js"
+    "mcp-server": "./dist/mcp-server.js"
   },
   "scripts": {
     "build": "tsup",
@@ -22,14 +22,17 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.11.4",
+    "@promptx/config": "workspace:*",
     "@promptx/core": "workspace:*",
     "@promptx/logger": "workspace:*",
-    "fastmcp": "^3.15.2",
-    "zod": "^3.23.8",
+    "chalk": "^5.3.0",
     "commander": "^12.1.0",
-    "chalk": "^5.3.0"
+    "express": "^4.21.2",
+    "js-yaml": "^4.1.0",
+    "workerpool": "^9.3.3",
+    "zod": "^3.23.8"
   },
-  "devDependencies": {},
   "files": [
     "dist",
     "package.json",
@@ -37,5 +40,8 @@
   ],
   "publishConfig": {
     "access": "public"
+  },
+  "devDependencies": {
+    "@types/js-yaml": "^4.0.9"
   }
 }
